@@ -1,0 +1,56 @@
+<!DOCTYPE html>
+<html>
+	<head>
+		<title>Game</title>
+		<style>
+
+			label{
+				color:#00FFF3;
+			}
+
+			button{
+				color:#7800FF;
+			}
+
+		</style>
+	</head>
+	<body>
+		<div>
+				<label>Name?</label>
+				<input type='text' name='Name'>
+				<label>Theme?(Water,Land Sky)</label>
+				<input type='text' name='Theme'>
+				<label>Animal?</label>
+        <input type='text' name='Animal'>
+        <label>Username</label>
+        <input type='text' name='Username'>
+        <label>Password</label>
+	      <input type='password' name='password'>
+				<button>SUBMIT</button>
+
+		</div>
+			<script>
+				var $inputs = document.querySelectorAll('input');
+				var $button = document.querySelector('button');
+
+				function storeData() {
+					var data = {};
+					for(var i = 0; i < $inputs.length; i++) {
+						var $input = $inputs[i];
+						data[$input.name] = $input.value
+					}
+					sendData(data);
+				}
+
+				function sendData(data) {
+				var req = new XMLHttpRequest();
+				req.open('POST', '/form', true);
+				req.setRequestHeader('content-type', 'application/json');
+				req.send(JSON.stringify(data));
+
+}
+
+				$button.addEventListener('click', storeData);
+
+			</script></body>
+</html>
