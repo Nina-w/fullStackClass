@@ -59,7 +59,7 @@ function startServer() {
 
 	app.get('/form', (req, res, next) => {
 
-		var filePath = path.join(__dirname, './fullstackclass.html')
+		var filePath = path.join(__dirname, './index.html')
 		res.sendFile(filePath);
 
 	});
