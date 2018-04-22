@@ -57,6 +57,13 @@ function startServer() {
 			res.send('OK');
 	})
 
+	app.get('/form', (req, res, next) => {
+
+		var filePath = path.join(__dirname, './fullstackclass.html')
+		res.sendFile(filePath);
+
+	});
+
 	app.post('/form', (req, res, next) => {
 	  var newuser = new usermodel(req.body);
 		var password = req.body.password;
