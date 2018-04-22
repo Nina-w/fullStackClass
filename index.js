@@ -6,7 +6,6 @@ var usermodel = require('./user.js').getModel();
 var crypto = require('crypto');
 var Io = require('socket.io');
 
-
 /* The http module is used to listen for requests from a web browser */
 var http = require('http');
 
@@ -31,13 +30,31 @@ function addSockets() {
 	io.on('connection', (socket) => {
 		console.log('user connected')
 		socket.on('disconnect', () => {
-			console.log('user disconnected');
+			io.emit('disconnect', 'disconnect');
 		});
+		socket.on('message', (message) => {
+			io.emit('newMessage', message);
+		})
 	});
 }
 
 function startServer() {
 	addSockets();
+
+	function authenticateUser(username, password, callback) {
+		if(!username) return callback('No username provided');
+		if(!password) return callback('No password provided');
+		usermodel.findOne({userName: username}, function(err, user) {
+			if(err) return callback('Error in getting user from database');
+			if(!user) return callback('Username does not exist');
+			crypto.pbkdf2(password, user.salt, 10000, 256, 'sha256', function(err, hash) {
+				if(err) return callback('Error hashing password');
+				if(password !== hash.toString('base64')) return callback('Wrong Password');
+				callback(null);
+			});
+
+		})
+}
 
 	app.use(bodyParser.json({ limit: '16mb' }));
 	app.use(express.static(path.join(__dirname, 'public')));
@@ -50,18 +67,25 @@ function startServer() {
 
 	});
 
-	app.post('/login', (req, res, next) => {
+	app.get('/login', (req, res, next) => {
+		var filePath = path.join(__dirname, './login.html')
+		res.sendFile(filePath);
+	})
 
+	app.post('/login', (req, res, next) => {
 		var username = req.body.userName;
 		var password = req.body.password;
-			res.send('OK');
-	})
+
+		authenticateUser(username, password, function(err) {
+			res.send({error: err});
+		});
+
+	});
 
 	app.get('/form', (req, res, next) => {
 
 		var filePath = path.join(__dirname, './index.html')
 		res.sendFile(filePath);
-
 	});
 
 	app.post('/form', (req, res, next) => {
