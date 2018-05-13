@@ -51,8 +51,12 @@
 						<tr><td align="left"><input type='checkbox' name='cat'><img src='http://www.san-x.co.jp/sumikko/img/profile/sg4.png'></td></tr>
 						<tr><td align="left"><input type='checkbox' name='dino'><img src='http://www.san-x.co.jp/sumikko/img/profile/sg5.png'></td></tr>
 					</table>
+					<div>
+						<label>Avatar</label>
+						<input type='file' accept-'image/*' name='avatar'>
+						<div id='avatar'></div>
+					</div>
 					<button>SUBMIT</button>
-
 	  </div>
 	</div>
 			<script>
@@ -70,10 +74,15 @@
 
 				function storeData() {
 					var data = {};
-					for(var i = 0; i < $inputs.length; i++) {
-						var $input = $inputs[i];
-						data[$input.name] = $input.value
+
+				for(var i = 0; i < $inputs.length; i++) {
+					var $input = $inputs[i];
+					if($input.type === 'text' || $input.type === 'password') {
+					data[$input.name] = $input.value;
+					} else if($input.type === 'file') {
+						data[$input.name] = imageData;
 					}
+				}
 					sendData(data);
 				}
 
@@ -81,24 +90,45 @@
 					if(!verifyPassword()) {
 						return;
 					}
+					if(!data.userName) return alert('Please Enter Username!');
+					if(!imageData) return alert('Enter An Avatar!');
+
 				var req = new XMLHttpRequest();
 				req.open('POST', '/form', true);
 				req.setRequestHeader('content-type', 'application/json');
 				function readyStateChange() {
 					if(req.readyState !== 4) return;
 					if(req.status !== 200) return;
+			    var body = JSON.parse(req.responseText);
+			    if(body.error) {
+			      return alert(body.error);
+			    }
 
-					data = JSON.parse(req.responseText);
-					if(data.error) {
-						alert(data.error);
-					}
+					window.location.href = '/game';
 				}
 				req.onreadystatechange = readyStateChange;
 				req.send(JSON.stringify(data));
 
-}
 
 				$button.addEventListener('click', storeData);
+
+				var $avatarInput = document.querySelector('input[name=avatar]');
+				var $preview = document.querySelector('#avatar');
+				var imageData;
+
+				$avatarInput.addEventListener('change', previewAvatar);
+
+				function previewAvatar() {
+					var fileReader = new FileReader();
+					fileReader.onload = function(e) {
+						imageData = e.target.result;
+						var $img = document.createElement('img');
+						$img.src = imageData;
+						$preview.innerHTML = '';
+						$preview.appendChild($img);
+					}
+					fileReader.readAsDataURL($avatarInput.files[0])
+				}
 
 			</script></body>
 </html>

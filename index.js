@@ -5,6 +5,10 @@ var mongoose = require('mongoose');
 var usermodel = require('./user.js').getModel();
 var crypto = require('crypto');
 var Io = require('socket.io');
+var passport = require('passport');
+var LocalStrategy = require('passport-local').Strategy;
+var session = require('express-session');
+var fs = require('fs');
 
 /* The http module is used to listen for requests from a web browser */
 var http = require('http');
@@ -27,13 +31,28 @@ var port =  process.env.PORT ? parseInt(process.env.PORT) : 8080;
 var dbAddress = process.env.MONGODB_URI || 'mongodb://127.0.0.1/game';
 
 function addSockets() {
+
+	var players = {};
+
 	io.on('connection', (socket) => {
-		console.log('user connected')
+		var user = socket.handshake.query.user;
+		players[user] = {
+			x: 0, y: 0
+		};
+
+		io.emit('playerUpdate', players);
+		io.emit('newMessage', {user: user,message: 'Entered the game'});
 		socket.on('disconnect', () => {
-			io.emit('disconnect', 'disconnect');
+			delete players[user];
+			io.emit('newMessage', {user: user, message: 'Left the game'});
+			io.emit('playerUpdate', players)
 		});
 		socket.on('message', (message) => {
 			io.emit('newMessage', message);
+		});
+		socket.on('playerUpdate', (player) => {
+			players[user] = player;
+			io.emit('playerUpdate', players);
 		})
 	});
 }
@@ -49,8 +68,8 @@ function startServer() {
 			if(!user) return callback('Username does not exist');
 			crypto.pbkdf2(password, user.salt, 10000, 256, 'sha256', function(err, hash) {
 				if(err) return callback('Error hashing password');
-				if(password !== hash.toString('base64')) return callback('Wrong Password');
-				callback(null);
+				if(user.password !== hash.toString('base64')) return callback('Wrong Password');
+				callback(null, user);
 			});
 
 		})
@@ -58,12 +77,31 @@ function startServer() {
 
 	app.use(bodyParser.json({ limit: '16mb' }));
 	app.use(express.static(path.join(__dirname, 'public')));
-	/* Defines what function to call when a request comes from the path '/' in http://localhost:8080 */
+	app.use(session({ secret: '🌸🦋🌸🦋🌸🦋🌸'}));
+	app.use(passport.initialize());
+	app.use(passport.session());
+
+	passport.use(new LocalStrategy({usernameField: 'userName', passwordField: 'password'}, authenticateUser));
+
+	passport.serializeUser(function(user, done) {
+		done(null, user.id);
+	})
+
+	passport.deserializeUser(function(id, done) {
+		usermodel.findById(id, function(err, user) {
+			done(err, user);
+		})
+	})
+
+
+	/* Defines what function to call when a request comes from the path '/' in http://localhost:8080  _  */
 
 	app.get('/game', (req, res, next) => {
-
-		var filePath = path.join(__dirname, './game.html')
-		res.sendFile(filePath);
+		if(!req.user) return res.redirect('/login?error=You%20have%20to%20log%20in!');
+		var filePath = path.join(__dirname, './game.html');
+		var fileContents = fs.readFileSync(filePath, 'utf8');
+		fileContents = fileContents.replace('{{USER}}', req.user.userName);
+		res.send(fileContents);
 
 	});
 
@@ -73,14 +111,38 @@ function startServer() {
 	})
 
 	app.post('/login', (req, res, next) => {
-		var username = req.body.userName;
-		var password = req.body.password;
 
-		authenticateUser(username, password, function(err) {
-			res.send({error: err});
+			passport.authenticate('local', function(err, user) {
+				if(err) return res.send({error: err});
+
+				req.logIn(user, (err) => {
+					if(err) return res.send({error: err});
+					return res.send({error: null})
+				})
+			})(req, res, next);
+
+	app.get('/picture/:username', (req, res, next) => {
+		if(!req.user) return res.send('YOU ARE NOT LOGGED IN');
+		usermodel.findOne({userName: req.params.username}, function(err, user) {
+			if(err) return res.send(err);
+			try {
+				var imageType = user.avatar.match(/^data:image\/([a-zA-Z0-9]*);/)[1];
+				var base64Data = user.avatar.split(',')[1];
+				var binaryData = new Buffer(base64Data, 'base64');
+				res.contentType('image/' + imageType);
+				res.end(binaryData, 'binary');
+			} catch(ex) {
+				res.send(ex);
+			}
+		})
+	})
+
 		});
 
-	});
+	app.get('/logout', (req, res, next) => {
+		req.logOut();
+		res.redirect('/login?error=You%20have%20logged%20out.')
+	})
 
 	app.get('/form', (req, res, next) => {
 
@@ -97,17 +159,25 @@ function startServer() {
 		crypto.pbkdf2(password, salt, iterations, 256, 'sha256', function(err, hash) {
 			if(err) {
 				return res.send({error: err});
-		}
-		newuser.password = hash.toString('base64');
-		newuser.save(function(err) {
-			// Handling the duplicate key errors from database
-			if(err && err.message.includes('duplicate key error') && err.message.includes('userName')) {
-				return res.send({error: 'Username, ' + req.body.userName + ' already taken'})
 			}
-			if(err) {
-				return res.send({error: err.message})
-			}
-			res.send({error: null});
+			newuser.password = hash.toString('base64');
+			newuser.save(function(err) {
+				// Handling the duplicate key errors from database
+				if(err && err.message.includes('duplicate key error') && err.message.includes('userName')) {
+					return res.send({error: 'Username, ' + req.body.userName + ' already taken'})
+				}
+				if(err) {
+					return res.send({error: err.message})
+				}
+
+				passport.authenticate('local', function(err, user) {
+					if(err) return res.send({error: err});
+
+					req.logIn(user, (err) => {
+						if(err) return res.send({error: err});
+						return res.send({error: null})
+					})
+				})(req, res, next);
 			});
 		});
 	});

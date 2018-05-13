@@ -81,6 +81,9 @@ function sendData(data) {
 
         var $button = document.querySelector('button')
         $button.addEventListener('click', submit)
+
+        var error = window.location.search.replace('?error=', '')
+        if(error) alert(decodeURIComponent(error));
         </script>
     </body>
 </html>
