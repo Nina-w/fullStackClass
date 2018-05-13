@@ -1,3 +1,6 @@
+/* When touch each other with same Avatar, they get bigger, opposite team, smaller. Whichever team has the biggest size, when the time stops wins. lizard, rice and cat teams and the dragon, bear and penguin is team one person blocks the other team from touching each other.
+/* or the thing like the art, but the avatar that can clear the picture the fastest wins!
+
 /* The express module is used to look at the address of the request and send it to the correct function */
 var express = require('express');
 var bodyParser = require('body-parser');
